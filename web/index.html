@@ -1,0 +1,231 @@
+<html>
+    <head>
+        <title>Slots Admin</title>
+        <meta name="viewport" content="initial-scale=1.0">
+        <meta charset="utf-8">
+        <style>
+            html, body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            #map {
+                height: 100%;
+            }
+        </style>
+        <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+        <script src="jsLibs/MapIconMaker.js"></script>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script src="jsLibs/gmaps.js"></script>
+
+        <script>
+
+            var map;
+            function initMap() {
+                map = new GMaps({
+                    div: '#map',
+                    lat: -34.606,
+                    lng: -58.435,
+                    zoom: 13,
+                    draggableCursor: 'crosshair'});
+                map.setContextMenu({
+                    control: 'map',
+                    options: [{
+                            title: 'Agregar Slot',
+                            name: 'add_slot',
+                            action: function (e) {
+                                addSlot(
+                                        e.latLng.lat(),
+                                        e.latLng.lng()
+                                        );
+                            }
+                        }]
+                });
+                map.setContextMenu({
+                    control: 'marker',
+                    options: [{
+                            title: 'Borrar Slot',
+                            name: 'remove_slot',
+                            action: function (e) {
+                                removeSlot(e.marker);
+                            }
+                        },
+                        {
+                            title: 'Liberar Slot',
+                            name: 'leave_slot',
+                            action: function (e) {
+                                leaveSlot(e.marker);
+                            }
+                        }]
+                });
+                map.addControl({
+                    position: 'top_center',
+                    content: 'Reportes',
+                    style: {
+                        margin: '5px',
+                        padding: '1px 6px',
+                        border: 'solid 1px #717B87',
+                        background: '#fff'
+                    },
+                    events: {
+                        click: function () {
+                            window.location="reports.html";
+                        }
+                    }
+                });
+                getSlots();
+            }
+
+        </script> 
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB9a2DwKfC2s-P1NkKFs89BZUbxSzeO_3E&callback=initMap"
+        async defer></script>
+        <script type="text/javascript">
+            var VERDE = 0;
+            var AMARILLO = 1;
+            var NARANJA = 2;
+            var ROJO = 3;
+            var iconBase =  'http://labs.google.com/ridefinder/images/'; //'icons/';
+                    
+            var icons = [
+                {
+                    icon: iconBase + 'mm_20_green.png' //'verde.png' 
+                },
+                {
+                    icon: iconBase + 'mm_20_yellow.png' // 'amarillo.png' 
+                },
+                {
+                    icon: iconBase + 'mm_20_orange.png' // 'naranja.png'
+                },
+                {
+                    icon: iconBase + 'mm_20_red.png' // 'rojo.png'
+                }
+            ];
+            
+            var latitud, longitud
+            function addSlot(lat, lng) {
+                latitud = lat;
+                longitud = lng;
+                var soapRequest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:addSlot xmlns:ns2=\"http://slotsws/\"><lat>" + lat + "</lat><lng>" + lng + "</lng></ns2:addSlot></S:Body></S:Envelope>";
+                var url11 = window.location.protocol + "//" + window.location.host + "/SlotsWS/SlotsWS?wsdl";
+                $.ajax({
+                    type: "POST",
+                    url: url11,
+                    contentType: "text/xml; charset=\"utf-8\"",
+                    dataType: "xml",
+                    data: soapRequest,
+                    processData: false,
+                    success: addSlotSuccess,
+                    error: wsError
+                });
+            }
+
+            function addSlotSuccess(data, status, req) {
+                if (status === "success") {
+                    var xml = req.responseText;
+                    xmlDoc = $.parseXML(xml),
+                            $xml = $(xmlDoc),
+                            $return = $xml.find("return");
+                    alert("Slot " + $return.text() + " agregado");
+                    var marker=map.addMarker({lat: latitud, lng: longitud, tag: $return.text(), icon: icons[VERDE].icon});
+                }
+            }
+            
+            var removedMarker;
+            function removeSlot(marker) {
+                var id=marker.tag;
+                removedMarker=marker;
+                var soapRequest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:removeSlot xmlns:ns2=\"http://slotsws/\"><id>" + id +"</id></ns2:removeSlot></S:Body></S:Envelope>";
+                var url11 = window.location.protocol + "//" + window.location.host + "/SlotsWS/SlotsWS?wsdl";
+                $.ajax({
+                    type: "POST",
+                    url: url11,
+                    contentType: "text/xml; charset=\"utf-8\"",
+                    dataType: "xml",
+                    data: soapRequest,
+                    processData: false,
+                    success: removeSlotSuccess,
+                    error: wsError
+                });
+            }
+
+            function removeSlotSuccess(data, status, req) {
+                if (status === "success") {
+                    alert("Slot " + removedMarker.tag + " borrado");
+                    map.removeMarker(removedMarker);
+                }
+            }
+            
+            var leavedMarker;
+            function leaveSlot(marker) {
+                var id=marker.tag;
+                leavedMarker=marker;
+                var soapRequest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:leaveSlotById xmlns:ns2=\"http://slotsws/\"><id>" + id + "</id></ns2:leaveSlotById></S:Body></S:Envelope>";
+                var url11 = window.location.protocol + "//" + window.location.host + "/SlotsWS/SlotsWS?wsdl";
+                $.ajax({
+                    type: "POST",
+                    url: url11,
+                    contentType: "text/xml; charset=\"utf-8\"",
+                    dataType: "xml",
+                    data: soapRequest,
+                    processData: false,
+                    success: leaveSlotSuccess,
+                    error: wsError
+                });
+            }
+
+            function leaveSlotSuccess(data, status, req) {
+                if (status === "success") {
+                    alert("Slot " + leavedMarker.tag + " liberado");        
+                    map.removeMarker(leavedMarker);
+                    map.addMarker({lat: leavedMarker.position.lat(), lng: leavedMarker.position.lng(), tag: leavedMarker.tag , icon:icons[VERDE].icon }); 
+                    
+                }
+            }
+
+            function wsError(data, status, req) {
+                if (data.status===500) {
+                    var xml=data.responseXML;
+                    $xml=$(xml);
+                    alert($xml.find('faultstring').text());
+                }
+                else {
+                    alert(req);
+                }
+            }
+
+            function getSlots() {
+                var soapRequest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:getAllSlots xmlns:ns2=\"http://slotsws/\"/></S:Body></S:Envelope>";
+                var url11 = window.location.protocol + "//" + window.location.host + "/SlotsWS/SlotsWS?wsdl";
+                $.ajax({
+                    type: "POST",
+                    url: url11,
+                    contentType: "text/xml; charset=\"utf-8\"",
+                    dataType: "xml",
+                    data: soapRequest,
+                    processData: false,
+                    success: getSlotsSuccess,
+                    error: wsError
+                });
+            }
+
+            function getSlotsSuccess(data, status, req) {
+                if (status === "success") {
+                    var xml = req.responseText;
+                    xmlDoc = $.parseXML(xml),
+                            $xml = $(xmlDoc);
+                    $xml.find('return').each(function (i, v) {
+                        var arrItem = [];
+                        $(v).find("item").each(function (j, item) {
+                            arrItem.push(Number($(item).text()));
+                        });
+                        map.addMarker({lat: arrItem[0], lng: arrItem[1], tag: arrItem[2], icon: icons[arrItem[3]].icon});
+                                //addListener("rightclick",markMenu);
+                    });
+                }
+            }
+        </script>
+
+    </body>
+</html>

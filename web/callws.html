@@ -1,0 +1,50 @@
+ <html>
+  <head>
+    <title>Calling Web Service from jQuery</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.3/jquery.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#btnCallWebService").click(function (event) {
+
+
+            var soapRequest="<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:addSlot xmlns:ns2=\"http://slotsws/\"><lat>-34.607834</lat><lng>-58.43287</lng></ns2:addSlot></S:Body></S:Envelope>";
+
+            var url11 = "http://localhost:8080/SlotsWS/SlotsWS?wsdl";
+
+
+        $.ajax({
+                type: "POST",
+                url: url11,
+                contentType:  "text/xml; charset=\"utf-8\"",
+                dataType: "xml",
+                data: soapRequest,
+         processData: false,
+                success: processSuccess,
+                error: processError
+            });
+
+        });
+    });
+
+    function processSuccess(data, status, req) {
+        if (status == "success")
+        alert(req.responseText + " @@@" + status);
+            $("#response").text();
+    }
+
+    function processError(data, status, req) {
+        alert(req.responseText + " " + status);
+    }  
+
+    </script>
+ </head>
+<body>
+<h3>
+    Calling Web Services with jQuery/AJAX
+ </h3>
+
+    <input id="btnCallWebService" value="Call web service" type="button" />
+
+    <div id="response" ></div>
+ </body>
+ </html>

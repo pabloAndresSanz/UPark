@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Slots Admin Reportes</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dc/1.7.5/dc.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap-responsive.css" />
+    </head>
+    <body>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter/1.3.12/crossfilter.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dc/1.7.5/dc.js"></script>
+        <script type="text/javascript" src="../js/dc.js"></script>
+        <script type="text/javascript">
+            function getRentsXML() {
+                $.get("datos.xml", function (data) {
+                    getRentsSuccess("", "success", {"responseText": data});
+                });
+            }
+            function getRents() {
+                var soapRequest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"><SOAP-ENV:Header/><S:Body><ns2:getRents xmlns:ns2=\"http://slotsws/\"/></S:Body></S:Envelope>";
+                var url11 = window.location.protocol + "//" + window.location.host + "/SlotsWS/SlotsWS?wsdl";
+                $.ajax({
+                    type: "POST",
+                    url: url11,
+                    contentType: "text/xml; charset=\"utf-8\"",
+                    dataType: "xml",
+                    data: soapRequest,
+                    processData: false,
+                    success: getRentsSuccess,
+                    error: wsError
+                });
+            }
+            function getRentsSuccess(data, status, req) {
+                if (status === "success") {
+                    var ymdFormat = d3.time.format("%Y-%m-%d");
+                    var xml = req.responseText;
+                    $xml = $(xml);
+                    $xml.find('return').each(function (i, v) {
+                        var item = $(v).find("item");
+                        rents.push({
+                            "idSlot": +$(item[0]).text(),
+                            "hora": +$(item[1]).text(),
+                            "cuanto": +$(item[2]).text(),
+                            "dia": ymdFormat.parse($(item[3]).text().split("T")[0])
+
+                        })
+                    });
+                    var ndx = crossfilter(rents);
+                    var diaDimension = ndx.dimension(function (d) {
+                        return d.dia;
+                    });
+                    var horaDimension = ndx.dimension(function (d) {
+                        return d.hora;
+                    });
+                    var diaGroup = diaDimension.group();
+                    var horaGroup = horaDimension.group();
+                    var tiempoPorDia = diaDimension.group().reduceSum(function (d) {
+                        return d.cuanto;
+                    });
+                    var dayOfWeek = ndx.dimension(function (d) {
+                        var day = d.dia.getDay();
+                        var name = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                        return day + '.' + name[day];
+                    });
+                    var dayOfWeekGroup = dayOfWeek.group();
+                    var rentsBarChartByDay = dc.barChart("#chart-bar-rentsperday");
+                    var rentsBarChartByHour = dc.barChart("#chart-bar-rentsperhour");
+                    var rentsBarByWeekDay = dc.rowChart("#chart-bar-rentsperweekday");
+                    var minDate = diaDimension.bottom(1)[0].dia;
+                    var maxDate = diaDimension.top(1)[0].dia;
+                    rentsBarChartByDay
+                            .width(1000).height(200)
+                            .dimension(diaDimension)
+                            .group(diaGroup)
+                            .yAxisLabel("Rents por fecha")
+                            .x(d3.time.scale().domain([minDate, maxDate]));
+                    rentsBarChartByHour
+                            .width(1000).height(200)
+                            .dimension(horaDimension)
+                            .group(horaGroup)
+                            .yAxisLabel("Rents por hora")
+                            .x(d3.scale.linear()
+                                    .domain([0, 24])
+                                    .rangeRound([0, 10 * 24]));
+                    rentsBarByWeekDay
+                            .width(1000).height(200)
+                            .dimension(dayOfWeek)
+                            .group(dayOfWeekGroup)
+                            .label(function (d) {
+                                return d.key.split('.')[1];
+                            })
+                            .title(function (d) {
+                                return d.value;
+                            })
+                            .elasticX(true);
+                    dc.renderAll();
+                }
+            }
+            function wsError(data, status, req) {
+                if (data.status === 500) {
+                    var xml = data.responseXML;
+                    $xml = $(xml);
+                    alert($xml.find('faultstring').text());
+                } else {
+                    alert(req);
+                }
+            }
+            var dateFormat = d3.time.format('%x %X');
+            function updateRows(e, data) {
+                d3.select(e)
+                        .selectAll('tr.item')
+                        .data(data)
+                        .enter()
+                        .append('tr')
+                        .classed('item', true)
+                        .html(function (d) {
+                            var ret = '';
+                            ret += '<td>' + dateFormat(d.dia) + '</td>';
+                            ret += '<td>' + d.hora + '</td>';
+                            ret += '<td>' + d.cuanto + '</td>';
+                            ret += '<td>' + d.idSlot + '</td>';
+                            return ret;
+                        });
+            }
+            function updateGroupRows(e, data) {
+                d3.select(e)
+                        .selectAll('tr.item')
+                        .data(data)
+                        .enter()
+                        .append('tr')
+                        .classed('item', true)
+                        .html(function (d) {
+                            var ret = '';
+                            ret += '<td>' + d.key + '</td>';
+                            ret += '<td>' + d.value + '</td>';
+                            return ret;
+                        });
+            }
+            var rents = [];
+            getRents();
+
+
+        </script>
+        <h1>Slots Reports</h1>
+        <div id="chart-bar-rentsperday"></div>
+        
+        <div id="chart-bar-rentsperhour" style="clear:left"></div>
+        
+        <div id="chart-bar-rentsperweekday" style="clear:left"></div>  
+    </body>
+</html>
